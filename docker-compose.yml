@@ -1,0 +1,52 @@
+# docker-compose.yml
+# ---------------------------------------------------------------------------
+# This file describes the *infrastructure* our app needs to run locally:
+# a PostgreSQL database and a Redis cache. Instead of installing either of
+# them on your machine, Docker runs each one inside an isolated "container"
+# (a lightweight sandboxed process with its own filesystem).
+#
+# Start everything:   docker compose up -d      (-d = detached / background)
+# Stop everything:    docker compose down
+# Stop + wipe data:   docker compose down -v    (-v also deletes the volumes)
+# See what's running: docker compose ps
+# ---------------------------------------------------------------------------
+
+services:
+  # --- PostgreSQL: our source of truth. All the correctness guarantees
+  #     (unique constraints, row locking) live here. ---
+  postgres:
+    image: postgres:16                # exact major version — matches CLAUDE.md §2
+    container_name: ticketflow-postgres
+    environment:
+      POSTGRES_DB: ticketflow         # a database named "ticketflow" is created on first boot
+      POSTGRES_USER: ticketflow       # login role
+      POSTGRES_PASSWORD: ticketflow   # fine for local dev; never do this in production
+      TZ: UTC                         # run the DB server in UTC too
+    ports:
+      - "5432:5432"                   # map container port 5432 -> your machine's 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data   # persist DB files between restarts
+    healthcheck:                      # lets other tools wait until PG is actually ready
+      test: ["CMD-SHELL", "pg_isready -U ticketflow -d ticketflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # --- Redis: a fast in-memory store. Later (Phase 5) we use it to hold
+  #     an 8-minute TTL key per seat-hold for quick expiry lookups.
+  #     It is an *index*, not the source of truth. ---
+  redis:
+    image: redis:7
+    container_name: ticketflow-redis
+    ports:
+      - "6379:6379"                   # default Redis port
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+# Named volumes are managed by Docker and survive `docker compose down`
+# (but not `docker compose down -v`).
+volumes:
+  postgres_data:
