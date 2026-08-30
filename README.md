@@ -52,7 +52,7 @@ Seat status (AVAILABLE / HELD / SOLD) is derived from these tables, never stored
 ## Progress
 
 - [x] Phase 0 — scaffolding: app boots, connects to Postgres + Redis, Flyway wired
-- [ ] Phase 1 — domain model, migrations, seed data
+- [x] Phase 1 — domain model, migrations, seed data (1 event, 500 seats)
 - [ ] Phase 2 — auth
 - [ ] Phase 3 — read APIs
 - [ ] Phase 4 — seat holds (pessimistic locking)

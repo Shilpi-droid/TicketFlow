@@ -17,8 +17,18 @@ V<version>__<description>.sql
 
 Examples: `V1__create_events_and_seats.sql`, `V2__add_seat_holds.sql`.
 
-## Phase 0
+## Rules
 
-No migration files exist yet. On startup Flyway still connects, creates
-`flyway_schema_history`, finds nothing to do, and reports success — that is
-the proof that Flyway is wired correctly. The real schema arrives in Phase 1.
+- **Never edit a migration that has run on a shared database.** Flyway stores a
+  checksum; a changed file fails startup with a checksum mismatch. Add a new
+  `V<n>` instead. (Editing one that has only ever run on your local dev DB is
+  fine — wipe and recreate with `docker compose down -v && docker compose up`.)
+- The schema is owned entirely by these files. Hibernate runs with
+  `ddl-auto=validate` and never changes tables.
+
+## Current migrations
+
+| File | What it does |
+|------|--------------|
+| `V1__initial_schema.sql` | All 7 tables + the unique constraints that guarantee no double-sell |
+| `V2__seed_demo_event.sql` | Demo data: 1 event, 500 seats across 3 sections |
