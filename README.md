@@ -49,13 +49,33 @@ Correctness is enforced by database constraints, not application logic:
 
 Seat status (AVAILABLE / HELD / SOLD) is derived from these tables, never stored.
 
+## Concurrency: preventing a double-sell of one seat
+
+Two requests read "seat 14 is free", both insert a hold, both proceed to sell.
+Three ways to stop that:
+
+| Approach | How | Trade-off |
+|---|---|---|
+| **Pessimistic lock** *(chosen)* | `SELECT … FOR UPDATE` on the seat rows (ordered by id) before checking availability; the loser blocks, then sees the winner's hold and gets 409 | One extra round trip and a held lock per request; serialises access per seat. Predictable under high contention for the same seat — which is exactly this workload (everyone wants the front row). |
+| Optimistic lock | `@Version` column; both proceed, second commit throws `OptimisticLockException`, retry | Great under low contention, wasteful when many requests target the same seat (lots of retries). |
+| Insert-and-catch | Just insert the hold; the partial unique index rejects the loser; catch `DataIntegrityViolationException` | Fewest moving parts, but you lose control over lock ordering for multi-seat requests and error messages are less precise. |
+
+We use the **pessimistic lock as the primary path and the partial unique index
+as a backstop** — if a bug ever lets two inserts through, the database still
+refuses the second. Seats are always locked in ascending id order so two
+multi-seat requests can't deadlock.
+
+Evidence: `SeatHoldConcurrencyTest` fires 50 threads at one seat against a real
+Postgres (Testcontainers) and asserts exactly one hold succeeds and exactly one
+row lands in `seat_holds`.
+
 ## Progress
 
 - [x] Phase 0 — scaffolding: app boots, connects to Postgres + Redis, Flyway wired
 - [x] Phase 1 — domain model, migrations, seed data (1 event, 500 seats)
 - [x] Phase 2 — auth: register/login, stateless JWT, `/me` protected, 401 on missing token
 - [x] Phase 3 — read APIs: `GET /events`, `GET /events/{id}/seats` with derived AVAILABLE/HELD/SOLD
-- [ ] Phase 4 — seat holds (pessimistic locking)
+- [x] Phase 4 — seat holds: `POST /events/{id}/holds`, pessimistic lock, all-or-nothing; 50-thread concurrency test
 - [ ] Phase 5 — hold expiry
 - [ ] Phase 6 — checkout + idempotent webhooks
 - [ ] Phase 7 — Kafka events (optional)

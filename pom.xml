@@ -130,6 +130,23 @@
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<!-- Testcontainers: starts a real PostgreSQL in Docker for the test run.
+		     Versions are managed by the spring-boot-starter-parent BOM (2.0.5).
+		     Testcontainers 2.x renamed every module with a "testcontainers-" prefix
+		     (was org.testcontainers:postgresql in 1.x).
+		     - testcontainers-postgresql     the PostgreSQLContainer class + JDBC glue
+		     - testcontainers-junit-jupiter  @Testcontainers / @Container lifecycle -->
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-postgresql</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -143,6 +160,16 @@
 					     PostgreSQL 16 container does not recognise, and every DB
 					     connection fails at startup. A server should run in UTC anyway. -->
 					<jvmArguments>-Duser.timezone=UTC</jvmArguments>
+				</configuration>
+			</plugin>
+			<plugin>
+				<!-- Surefire runs the tests in a forked JVM that does NOT inherit the
+				     spring-boot plugin's jvmArguments, so set the timezone here too or
+				     the Testcontainers Postgres rejects the connection (Asia/Calcutta). -->
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<argLine>-Duser.timezone=UTC</argLine>
 				</configuration>
 			</plugin>
 			<plugin>

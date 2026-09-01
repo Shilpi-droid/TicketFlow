@@ -2,6 +2,7 @@ package com.ticketflow.web;
 
 import com.ticketflow.auth.EmailAlreadyUsedException;
 import com.ticketflow.event.EventNotFoundException;
+import com.ticketflow.hold.SeatUnavailableException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
@@ -35,6 +36,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(EventNotFoundException.class)
     public ProblemDetail handleEventNotFound(EventNotFoundException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    /**
+     * At least one requested seat could not be held (sold, held by someone else,
+     * or nonexistent). All-or-nothing: no seats were held.
+     */
+    @ExceptionHandler(SeatUnavailableException.class)
+    public ProblemDetail handleSeatUnavailable(SeatUnavailableException ex) {
+        ProblemDetail problem =
+                ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setProperty("seatIds", ex.getSeatIds());
+        return problem;
     }
 
     @ExceptionHandler(BadCredentialsException.class)
