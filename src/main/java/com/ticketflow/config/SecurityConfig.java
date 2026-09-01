@@ -3,6 +3,7 @@ package com.ticketflow.config;
 import com.ticketflow.auth.JwtAuthenticationFilter;
 import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpMethod;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -55,6 +56,7 @@ public class SecurityConfig {
                     .dispatcherTypeMatchers(DispatcherType.ERROR, DispatcherType.ASYNC).permitAll()
                     .requestMatchers("/auth/**").permitAll()          // register + login
                     .requestMatchers("/actuator/health").permitAll()  // liveness probe
+                    .requestMatchers(HttpMethod.GET, "/events/**").permitAll()  // public browsing
                     .anyRequest().authenticated())                    // everything else: token required
 
             // When an unauthenticated caller hits a protected endpoint, return a

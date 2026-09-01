@@ -54,7 +54,7 @@ Seat status (AVAILABLE / HELD / SOLD) is derived from these tables, never stored
 - [x] Phase 0 — scaffolding: app boots, connects to Postgres + Redis, Flyway wired
 - [x] Phase 1 — domain model, migrations, seed data (1 event, 500 seats)
 - [x] Phase 2 — auth: register/login, stateless JWT, `/me` protected, 401 on missing token
-- [ ] Phase 3 — read APIs
+- [x] Phase 3 — read APIs: `GET /events`, `GET /events/{id}/seats` with derived AVAILABLE/HELD/SOLD
 - [ ] Phase 4 — seat holds (pessimistic locking)
 - [ ] Phase 5 — hold expiry
 - [ ] Phase 6 — checkout + idempotent webhooks
