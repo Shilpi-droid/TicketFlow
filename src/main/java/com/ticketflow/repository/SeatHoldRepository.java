@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -56,4 +57,37 @@ public interface SeatHoldRepository extends JpaRepository<SeatHold, Long> {
               and h.releasedAt is null
             """)
     long countActiveHoldsForSeat(@Param("seatId") Long seatId);
+
+    /**
+     * Background sweeper: mark every hold that is past its expiry (and not
+     * already released) as released. Returns the number of rows updated.
+     *
+     * @Modifying tells Spring Data this is an UPDATE, not a SELECT. It runs as a
+     * single "UPDATE seat_holds SET released_at = ? WHERE ..." — no entities are
+     * loaded. The caller must be @Transactional.
+     */
+    @Modifying
+    @Query("""
+            update SeatHold h
+            set h.releasedAt = :now
+            where h.releasedAt is null
+              and h.expiresAt < :now
+            """)
+    int releaseAllExpiredHolds(@Param("now") Instant now);
+
+    /**
+     * Same, but scoped to specific seats. The hold flow calls this (while holding
+     * the seat-row locks) so that a stale hold never blocks a fresh one, even in
+     * the ~30s window before the sweeper next runs.
+     */
+    @Modifying
+    @Query("""
+            update SeatHold h
+            set h.releasedAt = :now
+            where h.seat.id in :seatIds
+              and h.releasedAt is null
+              and h.expiresAt < :now
+            """)
+    int releaseExpiredHoldsForSeats(@Param("seatIds") Collection<Long> seatIds,
+                                    @Param("now") Instant now);
 }

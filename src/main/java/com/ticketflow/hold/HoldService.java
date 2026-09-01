@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,11 +46,14 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class HoldService {
 
-    static final Duration HOLD_DURATION = Duration.ofMinutes(8);
-
     private final SeatRepository seatRepository;
     private final SeatHoldRepository seatHoldRepository;
     private final BookingSeatRepository bookingSeatRepository;
+    private final HoldCache holdCache;
+
+    /** How long a hold lasts. From app.hold.duration (default PT8M). */
+    @Value("${app.hold.duration}")
+    private Duration holdDuration;
 
     @Transactional
     public HoldResponse hold(Long eventId, Long userId, List<Long> requestedSeatIds) {
@@ -80,9 +84,17 @@ public class HoldService {
                     "Seats do not belong to event " + eventId, wrongEvent);
         }
 
-        // 2. Now that the locks are held, check availability. Any hold or sale
-        //    that another transaction committed before us is visible here.
         Instant now = Instant.now();
+
+        // 2. Self-heal: release any hold on these seats that has already expired
+        //    but hasn't been swept yet. We hold the seat locks, so this is safe,
+        //    and it means a stale hold can't block a fresh one in the gap before
+        //    the background sweeper runs. Also clears the way past the partial
+        //    unique index (which only ignores rows where released_at IS NOT NULL).
+        seatHoldRepository.releaseExpiredHoldsForSeats(seatIds, now);
+
+        // 3. Now check availability. Any hold or sale that another transaction
+        //    committed before us is visible here.
         List<Long> taken = new ArrayList<>();
         taken.addAll(bookingSeatRepository.findSoldSeatIdsIn(seatIds));
         taken.addAll(seatHoldRepository.findActivelyHeldSeatIdsIn(seatIds, now));
@@ -90,9 +102,9 @@ public class HoldService {
             throw new SeatUnavailableException("Seats already taken: " + taken, taken);
         }
 
-        // 3. Insert one hold row per seat, all sharing a hold_group_id.
+        // 4. Insert one hold row per seat, all sharing a hold_group_id.
         UUID holdGroupId = UUID.randomUUID();
-        Instant expiresAt = now.plus(HOLD_DURATION);
+        Instant expiresAt = now.plus(holdDuration);
         List<SeatHold> holds = seats.stream().map(seat -> {
             SeatHold hold = new SeatHold();
             hold.setSeat(seat);
@@ -110,6 +122,12 @@ public class HoldService {
         } catch (DataIntegrityViolationException ex) {
             throw new SeatUnavailableException("A seat was taken concurrently", seatIds);
         }
+
+        // 5. Index the hold in Redis with a TTL = the remaining hold time. Best
+        //    effort: if Redis is down this does nothing and the hold is still
+        //    valid (Postgres has it). Written before commit — a rolled-back
+        //    transaction leaves an orphan key, but its TTL cleans that up.
+        holdCache.register(holdGroupId, holdDuration);
 
         return new HoldResponse(holdGroupId, expiresAt, seatIds);
     }

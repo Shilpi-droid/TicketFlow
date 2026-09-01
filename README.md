@@ -49,6 +49,24 @@ Correctness is enforced by database constraints, not application logic:
 
 Seat status (AVAILABLE / HELD / SOLD) is derived from these tables, never stored.
 
+**PostgreSQL is the source of truth. Redis is an index.** Redis holds a key per
+hold group with an 8-minute TTL for fast "is this hold still alive?" lookups, but
+if Redis and Postgres ever disagree, Postgres wins — every Redis call is
+best-effort and falls back to Postgres on failure.
+
+### Hold expiry
+
+A hold has `expires_at`. Three things enforce it, in order of importance:
+
+1. **Availability reads** treat `expires_at < now()` as free — so the seat map is
+   correct the instant a hold expires, with no job having run.
+2. **The hold flow self-heals** — before taking a seat it releases any expired
+   hold on that seat (while holding the row lock), so a stale hold never blocks a
+   fresh one.
+3. **A `@Scheduled` sweeper** every 30s sets `released_at` on expired holds — a
+   safety net that also runs once on startup, cleaning up anything that expired
+   while the app was down.
+
 ## Concurrency: preventing a double-sell of one seat
 
 Two requests read "seat 14 is free", both insert a hold, both proceed to sell.
@@ -76,7 +94,7 @@ row lands in `seat_holds`.
 - [x] Phase 2 — auth: register/login, stateless JWT, `/me` protected, 401 on missing token
 - [x] Phase 3 — read APIs: `GET /events`, `GET /events/{id}/seats` with derived AVAILABLE/HELD/SOLD
 - [x] Phase 4 — seat holds: `POST /events/{id}/holds`, pessimistic lock, all-or-nothing; 50-thread concurrency test
-- [ ] Phase 5 — hold expiry
+- [x] Phase 5 — hold expiry: read-time check + self-heal + `@Scheduled` sweeper + Redis TTL index
 - [ ] Phase 6 — checkout + idempotent webhooks
 - [ ] Phase 7 — Kafka events (optional)
 - [ ] Phase 8 — load test

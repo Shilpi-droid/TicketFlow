@@ -69,3 +69,9 @@ app:
     secret: ${JWT_SECRET:dev-only-change-me-please-a-long-random-string-0123456789}
     # How long an issued token stays valid. 24 hours, in milliseconds.
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  hold:
+    # How long a seat hold lasts. ISO-8601 duration ("PT8M" = 8 minutes).
+    # Override with APP_HOLD_DURATION=PT20S to watch expiry happen quickly.
+    duration: ${APP_HOLD_DURATION:PT8M}
+    # How often the background sweeper releases expired holds.
+    sweep-interval-ms: ${APP_HOLD_SWEEP_INTERVAL_MS:30000}
