@@ -1,6 +1,9 @@
 package com.ticketflow.web;
 
 import com.ticketflow.auth.EmailAlreadyUsedException;
+import com.ticketflow.booking.HoldNotActiveException;
+import com.ticketflow.booking.HoldNotFoundException;
+import com.ticketflow.booking.NotYourHoldException;
 import com.ticketflow.event.EventNotFoundException;
 import com.ticketflow.hold.SeatUnavailableException;
 import java.util.LinkedHashMap;
@@ -54,6 +57,21 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleBadCredentials(BadCredentialsException ex) {
         // Deliberately generic — do not reveal whether the email exists.
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Invalid email or password");
+    }
+
+    @ExceptionHandler(HoldNotFoundException.class)
+    public ProblemDetail handleHoldNotFound(HoldNotFoundException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(HoldNotActiveException.class)
+    public ProblemDetail handleHoldNotActive(HoldNotActiveException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(NotYourHoldException.class)
+    public ProblemDetail handleNotYourHold(NotYourHoldException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 
     /**

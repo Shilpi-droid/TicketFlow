@@ -57,6 +57,7 @@ public class SecurityConfig {
                     .requestMatchers("/auth/**").permitAll()          // register + login
                     .requestMatchers("/actuator/health").permitAll()  // liveness probe
                     .requestMatchers(HttpMethod.GET, "/events/**").permitAll()  // public browsing
+                    .requestMatchers("/webhooks/**").permitAll()      // payment provider callbacks (signature-verified in real life)
                     .anyRequest().authenticated())                    // everything else: token required
 
             // When an unauthenticated caller hits a protected endpoint, return a

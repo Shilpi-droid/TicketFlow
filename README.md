@@ -67,6 +67,24 @@ A hold has `expires_at`. Three things enforce it, in order of importance:
    safety net that also runs once on startup, cleaning up anything that expired
    while the app was down.
 
+### Checkout & payment webhooks
+
+`POST /checkout` (client sends an `Idempotency-Key` header) creates a `PENDING`
+booking from a hold group. No money moves — a fake payment provider then POSTs to
+`POST /webhooks/payment` to confirm it.
+
+- **Retried checkout** → same booking. `bookings UNIQUE (idempotency_key)` is the
+  guarantee; the "already exists?" check is the fast path.
+- **Duplicate webhook** → `webhook_events` is written first via
+  `INSERT ... ON CONFLICT (provider_event_id) DO NOTHING`; a return of 0 rows
+  means "seen before, skip". The provider can deliver the same event 5× and get
+  `200` every time with exactly one booking confirmed.
+- **Confirming** turns holds into `booking_seats` rows in one transaction;
+  `booking_seats UNIQUE (seat_id)` is the final backstop against a double-sell.
+- **Late webhook** (hold already expired) → booking is `CANCELLED`, no seats
+  sold, `200` returned, and a "would refund here" line is logged. The refund
+  itself is out of scope (no real provider).
+
 ## Concurrency: preventing a double-sell of one seat
 
 Two requests read "seat 14 is free", both insert a hold, both proceed to sell.
@@ -95,7 +113,7 @@ row lands in `seat_holds`.
 - [x] Phase 3 — read APIs: `GET /events`, `GET /events/{id}/seats` with derived AVAILABLE/HELD/SOLD
 - [x] Phase 4 — seat holds: `POST /events/{id}/holds`, pessimistic lock, all-or-nothing; 50-thread concurrency test
 - [x] Phase 5 — hold expiry: read-time check + self-heal + `@Scheduled` sweeper + Redis TTL index
-- [ ] Phase 6 — checkout + idempotent webhooks
+- [x] Phase 6 — checkout + idempotent webhooks: `Idempotency-Key`, `ON CONFLICT` webhook log, late-webhook cancel
 - [ ] Phase 7 — Kafka events (optional)
 - [ ] Phase 8 — load test
 - [ ] Phase 9 — README + deploy
