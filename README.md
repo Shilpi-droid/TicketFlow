@@ -105,6 +105,35 @@ Evidence: `SeatHoldConcurrencyTest` fires 50 threads at one seat against a real
 Postgres (Testcontainers) and asserts exactly one hold succeeds and exactly one
 row lands in `seat_holds`.
 
+## Performance (Phase 8 load test)
+
+`loadtest/seat-rush.js` — **200 virtual users racing for 50 seats** for 45s.
+Each iteration: `POST /events/1/holds` for a random seat; on a win,
+`POST /checkout` then `POST /webhooks/payment`. Run locally (single JVM, single
+Postgres container, `maximum-pool-size: 30`).
+
+| Metric | Result |
+|---|---|
+| Hold attempts | 19,113 in 45s |
+| Throughput | **~416 req/s** sustained |
+| Hold latency | p50 348 ms · p90 752 ms · **p95 921 ms** (heavy lock contention: ~4 users per seat row) |
+| 409 rate (seat already taken) | **99.7%** — expected under 4× oversubscription; the system correctly rejecting losers |
+| 5xx errors | **0** (k6 threshold, build fails otherwise) |
+| Seats sold | 50 held → 50 bookings confirmed |
+
+Correctness check after the run
+(`SELECT seat_id, count(*) FROM booking_seats GROUP BY seat_id HAVING count(*) > 1`):
+
+```
+ seat_id | times_sold
+---------+------------
+(0 rows)          ← 50 distinct seats, each sold exactly once
+```
+
+19,113 concurrent attempts, zero seats oversold, zero server errors.
+
+See [loadtest/](loadtest/) to reproduce.
+
 ## Progress
 
 - [x] Phase 0 — scaffolding: app boots, connects to Postgres + Redis, Flyway wired
@@ -114,6 +143,6 @@ row lands in `seat_holds`.
 - [x] Phase 4 — seat holds: `POST /events/{id}/holds`, pessimistic lock, all-or-nothing; 50-thread concurrency test
 - [x] Phase 5 — hold expiry: read-time check + self-heal + `@Scheduled` sweeper + Redis TTL index
 - [x] Phase 6 — checkout + idempotent webhooks: `Idempotency-Key`, `ON CONFLICT` webhook log, late-webhook cancel
-- [ ] Phase 7 — Kafka events (optional)
-- [ ] Phase 8 — load test
+- [~] Phase 7 — Kafka events — **cut** (would be résumé garnish here; a transactional outbox + read-model is the version worth doing, noted as future work)
+- [x] Phase 8 — load test: 200 VUs / 50 seats, ~416 req/s, p95 921 ms, 0 oversold, 0 5xx
 - [ ] Phase 9 — README + deploy
