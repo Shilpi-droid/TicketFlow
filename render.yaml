@@ -1,0 +1,52 @@
+# render.yaml — Render Blueprint
+# ---------------------------------------------------------------------------
+# Provisions the whole stack from this repo: a Dockerized web service, a managed
+# PostgreSQL, and a managed Key Value (Redis) store. Render reads this file when
+# you create a Blueprint pointing at the repo — no CLI needed.
+#
+# See DEPLOY.md for the click-by-click.
+# ---------------------------------------------------------------------------
+
+databases:
+  - name: ticketflow-db
+    plan: free
+    databaseName: ticketflow
+    user: ticketflow
+
+services:
+  # Redis-compatible Key Value store (Phase 5 hold-TTL index).
+  - type: keyvalue
+    name: ticketflow-redis
+    plan: free
+    ipAllowList: []          # reachable only from services in this Blueprint
+
+  - type: web
+    name: ticketflow
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /actuator/health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "8080"
+
+      # JWT signing secret — Render generates 256 bits of random data.
+      - key: JWT_SECRET
+        generateValue: true
+
+      # PostgreSQL — wired from the managed database above.
+      - key: DB_HOST
+        fromDatabase: { name: ticketflow-db, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: ticketflow-db, property: port }
+      - key: DB_NAME
+        fromDatabase: { name: ticketflow-db, property: database }
+      - key: DB_USER
+        fromDatabase: { name: ticketflow-db, property: user }
+      - key: DB_PASSWORD
+        fromDatabase: { name: ticketflow-db, property: password }
+
+      # Redis — wired from the Key Value store above.
+      - key: REDIS_URL
+        fromService: { type: keyvalue, name: ticketflow-redis, property: connectionString }

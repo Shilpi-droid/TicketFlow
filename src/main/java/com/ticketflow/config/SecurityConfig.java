@@ -58,6 +58,8 @@ public class SecurityConfig {
                     .requestMatchers("/actuator/health").permitAll()  // liveness probe
                     .requestMatchers(HttpMethod.GET, "/events/**").permitAll()  // public browsing
                     .requestMatchers("/webhooks/**").permitAll()      // payment provider callbacks (signature-verified in real life)
+                    .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**")
+                        .permitAll()                                  // interactive API docs
                     .anyRequest().authenticated())                    // everything else: token required
 
             // When an unauthenticated caller hits a protected endpoint, return a

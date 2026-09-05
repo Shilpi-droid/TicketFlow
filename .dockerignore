@@ -1,0 +1,19 @@
+target/
+.git/
+.github/
+.idea/
+*.iml
+.vscode/
+.mvn/wrapper/maven-wrapper.jar
+
+# private / non-shipping docs
+NOTES.md
+SETUP.md
+DEPLOY.md
+claude.md
+CLAUDE.md
+HELP.md
+
+# not needed in the image
+loadtest/
+README.md

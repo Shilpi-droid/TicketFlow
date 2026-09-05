@@ -9,13 +9,20 @@
 # your laptop and on a deployed server without edits.
 # ---------------------------------------------------------------------------
 
+server:
+  # Hosts (Render, Fly, ...) inject the port to bind on via $PORT.
+  port: ${PORT:8080}
+
 spring:
   application:
     name: ticketflow
 
-  # --- How to reach PostgreSQL (must match docker-compose.yml) ---
+  # --- How to reach PostgreSQL ---
+  # Locally: the docker-compose Postgres via the defaults below.
+  # Deployed: set DB_HOST / DB_PORT / DB_NAME / DB_USER / DB_PASSWORD (the
+  # render.yaml wires these from the managed database), or override DB_URL wholesale.
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/ticketflow}
+    url: ${DB_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:ticketflow}}
     username: ${DB_USER:ticketflow}
     password: ${DB_PASSWORD:ticketflow}
     hikari:
@@ -44,10 +51,11 @@ spring:
     locations: classpath:db/migration
 
   # --- Redis connection (used from Phase 5 onward) ---
+  # Deployed: REDIS_URL (redis://[:password@]host:port) if the host gives one,
+  # otherwise REDIS_HOST / REDIS_PORT / REDIS_PASSWORD.
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
+      url: ${REDIS_URL:redis://${REDIS_HOST:localhost}:${REDIS_PORT:6379}}
 
 # --- Actuator: exposes operational endpoints. We only open "health" and
 #     "info". /actuator/health returning UP is the Phase 0 acceptance check. ---

@@ -294,6 +294,18 @@ curl http://localhost:8080/actuator/health    # {"status":"UP"}
 The JVM runs in UTC (`-Duser.timezone=UTC`, set in `pom.xml`); without it a
 machine on a non-UTC locale can fail to connect to Postgres 16.
 
+**Interactive API docs** once running: `http://localhost:8080/swagger-ui.html`
+(spec at `/v3/api-docs`). Click **Authorize**, paste a JWT from `POST /auth/login`,
+and every protected call in the UI sends it.
+
+---
+
+## Deploying
+
+A `Dockerfile` + a Render Blueprint (`render.yaml`) provision the app, a managed
+PostgreSQL, and a managed Redis-compatible store from this repo in one step — see
+[`DEPLOY.md`](DEPLOY.md).
+
 ---
 
 ## Deliberately out of scope
@@ -326,7 +338,7 @@ Judgement calls, not omissions:
 | 6 | Checkout + idempotent webhooks — `Idempotency-Key`, `ON CONFLICT` log, late-webhook cancel |
 | 7 | Kafka — **cut** (see *Deliberately out of scope*) |
 | 8 | Load test — 200 VUs / 50 seats, ~416 req/s, p95 921 ms, 0 oversold, 0 `5xx` |
-| 9 | README + deploy |
+| 9 | README polish + Swagger UI + Docker/Render deploy prep |
 
 > Built on Spring Boot 4.1 rather than the 3.x the plan assumed —
 > `start.spring.io` no longer generates 3.x projects.
